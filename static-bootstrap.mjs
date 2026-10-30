@@ -17,4 +17,4 @@ globalThis.fetch = (input, init = {}) => {
     headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
   }));
 };
-await import('./app.js');
+await import('./app.js?v=alarm-details-1');
