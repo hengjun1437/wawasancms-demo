@@ -39,8 +39,58 @@ function eventCard(event, deviceName) {
   const detail = document.createElement('span'); detail.textContent = `${deviceName} · ${formatTime(event.occurredAt)}`;
   body.append(title, detail);
   const badge = document.createElement('span'); badge.className = `event-state ${event.state === 'active' ? 'state-active' : 'state-clear'}`; badge.textContent = event.state === 'active' ? 'Active' : 'Cleared';
-  article.append(icon, body, badge); return article;
+  const open = document.createElement('button'); open.type = 'button'; open.className = 'row-action alarm-open'; open.textContent = 'View alarm'; open.setAttribute('aria-label', 'View alarm details'); open.addEventListener('click', () => showAlarm(event));
+  article.append(icon, body, badge, open); return article;
 }
+
+function showAlarm(event) {
+  // Deliberately user-initiated only: no automatic popups, timers, or browser notifications.
+  if (!activeDemoUser || !state.events.some(item => item.id === event.id)) return;
+  const device = state.devices.find(item => item.id === event.deviceId);
+  if (!device) return;
+  const site = state.sites.find(item => item.id === device.siteId);
+  if (!site) return;
+  const dialog = $('#alarm-dialog');
+  const content = $('#alarm-dialog-content');
+  content.replaceChildren();
+  const info = document.createElement('div'); info.className = 'alarm-detail-grid';
+  for (const [label, value] of [
+    ['Customer', $('#demo-identity').textContent.split(' · ')[0]],
+    ['Site', site.name], ['NVR', device.name],
+    ['Camera', 'CH' + String((event.channelIndex ?? 0) + 1).padStart(2, '0')],
+    ['Alarm', event.eventType === 'motion' ? 'Motion detected' : event.eventType],
+    ['State', event.state === 'active' ? 'Active' : 'Cleared'],
+    ['Occurred', formatTime(event.occurredAt)]
+  ]) {
+    const field = document.createElement('div');
+    const key = document.createElement('small'); key.textContent = label;
+    const val = document.createElement('strong'); val.textContent = value;
+    field.append(key, val); info.append(field);
+  }
+  const videoTitle = document.createElement('h3'); videoTitle.textContent = 'Camera Live View';
+  const video = document.createElement('div'); video.className = 'alarm-video-placeholder';
+  const cameraIcon = document.createElement('span'); cameraIcon.textContent = '▣'; cameraIcon.setAttribute('aria-hidden', 'true');
+  const videoText = document.createElement('strong'); videoText.textContent = 'LIVE VIEW NOT CONNECTED';
+  const videoHint = document.createElement('p'); videoHint.textContent = 'Synthetic demo only. No camera stream, recording, or NVR connection.';
+  video.append(cameraIcon, videoText, videoHint);
+  const contactsTitle = document.createElement('h3'); contactsTitle.textContent = 'Customer Contact List';
+  const contacts = document.createElement('div'); contacts.className = 'alarm-contacts';
+  for (const [role, name] of [['Primary Contact', 'Demo Contact 1'], ['Backup Contact', 'Demo Contact 2']]) {
+    const row = document.createElement('div'); row.className = 'alarm-contact';
+    const text = document.createElement('div'); const label = document.createElement('small'); label.textContent = role;
+    const person = document.createElement('strong'); person.textContent = name; text.append(label, person);
+    const note = document.createElement('span'); note.textContent = 'Sample only · No phone number';
+    row.append(text, note); contacts.append(row);
+  }
+  const actions = document.createElement('div'); actions.className = 'alarm-actions';
+  const note = document.createElement('p'); note.textContent = 'Demo view only — no calls, acknowledgement, or escalation are sent.';
+  const close = document.createElement('button'); close.className = 'button-primary'; close.type = 'button'; close.textContent = 'Close details'; close.addEventListener('click', () => dialog.close());
+  actions.append(note, close);
+  content.append(info, videoTitle, video, contactsTitle, contacts, actions);
+  dialog.showModal();
+}
+$('#alarm-dialog-close').addEventListener('click', () => $('#alarm-dialog').close());
+
 function deviceRows(target, devices) {
   const rows = $(target); rows.replaceChildren();
   if (!devices.length) { const tr = document.createElement('tr'); const td = createCell('No matching devices.', 'empty-row'); td.colSpan = 7; tr.append(td); rows.append(tr); return; }
@@ -190,6 +240,7 @@ function resetDemo() {
   demoSelect.value = '';
   $('#refresh').disabled = false;
   if ($('#device-dialog').open) $('#device-dialog').close();
+  if ($('#alarm-dialog').open) $('#alarm-dialog').close();
   for (const id of ['site-count', 'gateway-count', 'device-count', 'alarm-count', 'nav-site-count', 'nav-gateway-count', 'nav-device-count', 'nav-alarm-count']) $(`#${id}`).textContent = '—';
   for (const id of ['site-rows', 'gateway-rows', 'device-rows', 'all-device-rows', 'recent-events', 'alarm-events']) $(`#${id}`).replaceChildren();
   $('#toast').classList.remove('visible');
