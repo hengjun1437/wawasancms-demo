@@ -1,6 +1,8 @@
 let activeDemoUser = null;
 let identityGeneration = 0;
 const state = { sites: [], gateways: [], devices: [], events: [], channels: [], storage: [] };
+// Session-only synthetic workflow; never sent to an API or treated as NVR state.
+const demoAlarmWorkflow = new Map();
 const $ = selector => document.querySelector(selector);
 const statusLabels = { online: 'Online', degraded: 'Degraded', offline: 'Offline', unknown: 'Unknown' };
 const pageCopy = {
@@ -40,6 +42,8 @@ function eventCard(event, deviceName) {
   body.append(title, detail);
   const badge = document.createElement('span'); badge.className = `event-state ${event.state === 'active' ? 'state-active' : 'state-clear'}`; badge.textContent = event.state === 'active' ? 'Active' : 'Cleared';
   const open = document.createElement('button'); open.type = 'button'; open.className = 'row-action alarm-open'; open.textContent = 'View alarm'; open.setAttribute('aria-label', 'View alarm details'); open.addEventListener('click', () => showAlarm(event));
+  const workflow = demoAlarmWorkflow.get(event.id);
+  if (workflow) { const progress = document.createElement('span'); progress.className = 'alarm-progress'; progress.textContent = workflow.status === 'acknowledged' ? 'Acknowledged (demo)' : 'Resolved (demo)'; body.append(progress); }
   article.append(icon, body, badge, open); return article;
 }
 
@@ -82,11 +86,33 @@ function showAlarm(event) {
     const note = document.createElement('span'); note.textContent = 'Sample only · No phone number';
     row.append(text, note); contacts.append(row);
   }
+  const workflowTitle = document.createElement('h3'); workflowTitle.textContent = 'Demo handling history';
+  const workflowLog = document.createElement('div'); workflowLog.className = 'alarm-workflow-log';
+  const workflowActions = document.createElement('div'); workflowActions.className = 'alarm-workflow-buttons';
+  function updateWorkflow() {
+    const record = demoAlarmWorkflow.get(event.id);
+    workflowLog.replaceChildren(); workflowActions.replaceChildren();
+    const hint = document.createElement('p'); hint.textContent = record ? `Demo handling status: ${record.status}` : 'Not yet acknowledged (demo)'; workflowLog.append(hint);
+    for (const entry of record?.history || []) { const item = document.createElement('p'); item.textContent = `${entry.action} · Demo operator · ${formatTime(entry.at)}`; workflowLog.append(item); }
+    if (event.state !== 'active') { const notice = document.createElement('p'); notice.textContent = 'Source alarm is already cleared. Demo handling actions are disabled.'; workflowLog.append(notice); return; }
+    const nextAction = !record ? 'acknowledged' : record.status === 'acknowledged' ? 'resolved' : null;
+    if (!nextAction) return;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'button-primary'; button.textContent = nextAction === 'acknowledged' ? 'Acknowledge (demo)' : 'Resolve (demo)';
+    button.addEventListener('click', () => {
+      if (!activeDemoUser || !state.events.some(item => item.id === event.id)) return;
+      const previous = demoAlarmWorkflow.get(event.id);
+      demoAlarmWorkflow.set(event.id, { status: nextAction, history: [...(previous?.history || []), { action: nextAction === 'acknowledged' ? 'Acknowledged' : 'Resolved', at: new Date().toISOString() }] });
+      updateWorkflow(); renderEvents('#alarm-events', currentAlarms());
+      renderEvents('#recent-events', [...state.events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 3));
+    }); workflowActions.append(button);
+  }
+  updateWorkflow();
   const actions = document.createElement('div'); actions.className = 'alarm-actions';
   const note = document.createElement('p'); note.textContent = 'Demo view only — no calls, acknowledgement, or escalation are sent.';
   const close = document.createElement('button'); close.className = 'button-primary'; close.type = 'button'; close.textContent = 'Close details'; close.addEventListener('click', () => dialog.close());
+  note.textContent = 'Demo handling is local to this browser session. No acknowledgement, resolution, calls, or escalation are sent to customers or NVRs.';
   actions.append(note, close);
-  content.append(info, videoTitle, video, contactsTitle, contacts, actions);
+  content.append(info, videoTitle, video, contactsTitle, contacts, workflowTitle, workflowLog, workflowActions, actions);
   dialog.showModal();
 }
 $('#alarm-dialog-close').addEventListener('click', () => $('#alarm-dialog').close());
@@ -232,6 +258,7 @@ const productionLink = $('#production-auth-info');
 const signOut = $('#demo-signout');
 function resetDemo() {
   identityGeneration++;
+  demoAlarmWorkflow.clear();
   activeDemoUser = null;
   Object.assign(state, { sites: [], gateways: [], devices: [], events: [], channels: [], storage: [] });
   $('#demo-login').hidden = false;
