@@ -22,3 +22,9 @@
 .alarm-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:18px}
 .alarm-actions p{font-size:10px;color:#8491a3;max-width:380px}
 @media(max-width:700px){.alarm-dialog{padding:16px}.alarm-open{font-size:9px}.event-item{flex-wrap:wrap}.alarm-actions{flex-direction:column;align-items:stretch}.alarm-detail-grid{gap:8px}}
+
+/* Synthetic handling controls: separate from NVR source alarm state */
+.alarm-progress{color:#365d9c!important;font-size:10px!important;font-weight:700}
+.alarm-workflow-log{background:#f5f7fa;border-radius:8px;padding:10px 14px;font-size:11px;color:#52627a}
+.alarm-workflow-log p{margin:5px 0}
+.alarm-workflow-buttons{display:flex;gap:10px;margin-top:12px}
